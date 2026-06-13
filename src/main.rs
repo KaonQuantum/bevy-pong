@@ -5,13 +5,14 @@ use bevy::{
 
 const BALL_SIZE: f32 = 5.;
 const BALL_SHAPE: Circle = Circle::new(BALL_SIZE);
-const BALL_COLOR: Color = Color::srgb(1., 0., 0.);
+const BALL_COLOR: Color = Color::srgb_u8(0xf7, 0x25, 0x85);
 const BALL_SPEED: f32 = 2.;
 
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
-const PADDLE_COLOR: Color = Color::srgb(0., 1., 0.);
+const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
+const PADDLE_SPEED: f32 = 5.;
 
-const GUTTER_COLOR: Color = Color::srgb(0.5, 0.5, 0.75);
+const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
 
 #[derive(Component, Default)]
@@ -49,6 +50,7 @@ struct Ball;
 #[derive(Component)]
 #[require(
     Position,
+    Velocity,
     Collider = Collider(PADDLE_SHAPE),
 )]
 struct Paddle;
@@ -63,9 +65,22 @@ struct Player;
 #[derive(Component)]
 struct Ai;
 
+#[derive(Resource)]
+struct Score {
+    player: u8,
+    ai: u8,
+}
+
+#[derive(EntityEvent)]
+struct Scored {
+    #[event_target]
+    scorer: Entity,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .insert_resource(Score { player: 0, ai: 0 })
         .add_systems(
             Startup,
             (spawn_ball, spawn_paddles, spawn_gutters, spawn_camera),
@@ -73,11 +88,17 @@ fn main() {
         .add_systems(
             FixedUpdate,
             (
+                handle_player_input.before(move_paddles),
                 move_ball.before(project_positions),
+                move_paddles.before(project_positions),
                 project_positions,
                 handle_collisions.after(move_ball),
+                constrain_paddle_position.after(move_paddles),
+                detect_goal.after(move_ball),
             ),
         )
+        .add_observer(reset_ball)
+        .add_observer(update_score)
         .run();
 }
 
@@ -203,6 +224,56 @@ fn handle_collisions(
     }
 }
 
+fn handle_player_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut paddle_velocity: Single<&mut Velocity, With<Player>>,
+) {
+    if keyboard_input.pressed(KeyCode::ArrowUp) || keyboard_input.pressed(KeyCode::KeyW) {
+        paddle_velocity.0.y = PADDLE_SPEED;
+    } else if keyboard_input.pressed(KeyCode::ArrowDown) || keyboard_input.pressed(KeyCode::KeyS) {
+        paddle_velocity.0.y = -PADDLE_SPEED;
+    } else {
+        paddle_velocity.0.y = 0.;
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn constrain_paddle_position(
+    mut paddles: Query<(&mut Position, &Collider), (With<Paddle>, Without<Gutter>)>,
+    gutters: Query<(&Position, &Collider), (With<Gutter>, Without<Paddle>)>,
+) {
+    for (mut paddle_position, paddle_collider) in &mut paddles {
+        for (gutter_position, gutter_collider) in &gutters {
+            let paddle_aabb = Aabb2d::new(paddle_position.0, paddle_collider.half_size());
+            let gutter_aabb = Aabb2d::new(gutter_position.0, gutter_collider.half_size());
+
+            if let Some(collision) = collide_with_side(paddle_aabb, gutter_aabb) {
+                match collision {
+                    Collision::Top => {
+                        paddle_position.0.y = gutter_position.0.y
+                            + gutter_collider.half_size().y
+                            + paddle_collider.half_size().y;
+                    }
+
+                    Collision::Bottom => {
+                        paddle_position.0.y = gutter_position.0.y
+                            - gutter_collider.half_size().y
+                            - paddle_collider.half_size().y;
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
+    for (mut position, velocity) in &mut paddles {
+        position.0 += velocity.0;
+    }
+}
+
 fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
     if !ball.intersects(&wall) {
         return None;
@@ -223,4 +294,46 @@ fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
     };
 
     Some(side)
+}
+
+fn detect_goal(
+    ball: Single<(&Position, &Collider), With<Ball>>,
+    player: Single<Entity, (With<Player>, Without<Ai>)>,
+    ai: Single<Entity, (With<Ai>, Without<Player>)>,
+    window: Single<&Window>,
+    mut commands: Commands,
+) {
+    let (ball_position, ball_collider) = ball.into_inner();
+    let half_window_size = window.resolution.size() / 2.;
+
+    if ball_position.0.x + ball_collider.half_size().x > half_window_size.x {
+        commands.trigger(Scored { scorer: *player });
+    }
+
+    if ball_position.0.x + ball_collider.half_size().x < -half_window_size.x {
+        commands.trigger(Scored { scorer: *ai });
+    }
+}
+
+fn reset_ball(_event: On<Scored>, ball: Single<(&mut Position, &mut Velocity), With<Ball>>) {
+    let (mut ball_position, mut ball_velocity) = ball.into_inner();
+    ball_position.0 = Vec2::ZERO;
+    ball_velocity.0 = Vec2::new(-BALL_SPEED, BALL_SPEED);
+}
+
+fn update_score(
+    event: On<Scored>,
+    mut score: ResMut<Score>,
+    is_ai: Query<&Ai>,
+    is_player: Query<&Player>,
+) {
+    if is_ai.get(event.scorer).is_ok() {
+        score.ai += 1;
+        info!("AI scored! {} – {}", score.player, score.ai);
+    }
+
+    if is_player.get(event.scorer).is_ok() {
+        score.player += 1;
+        info!("Player scored! {} – {}", score.player, score.ai);
+    }
 }
