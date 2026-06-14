@@ -105,10 +105,10 @@ fn main() {
                 move_paddles.before(project_positions),
                 project_positions,
                 handle_collisions.after(move_ball),
-                constrain_paddle_position.after(move_paddles),
+                constrain_paddle_position.after(move_paddles).after(move_ai),
                 detect_goal.after(move_ball),
                 update_scoreboard,
-                move_ai,
+                move_ai.before(project_positions),
             ),
         )
         .add_observer(reset_ball)
