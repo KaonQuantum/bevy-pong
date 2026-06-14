@@ -3902,6 +3902,7 @@ name = "pong"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "log",
 ]
 
 [[package]]
