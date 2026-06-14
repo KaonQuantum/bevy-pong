@@ -71,6 +71,12 @@ struct Score {
     ai: u8,
 }
 
+#[derive(Component)]
+struct PlayerScore;
+
+#[derive(Component)]
+struct AiScore;
+
 #[derive(EntityEvent)]
 struct Scored {
     #[event_target]
@@ -83,7 +89,13 @@ fn main() {
         .insert_resource(Score { player: 0, ai: 0 })
         .add_systems(
             Startup,
-            (spawn_ball, spawn_paddles, spawn_gutters, spawn_camera),
+            (
+                spawn_ball,
+                spawn_paddles,
+                spawn_gutters,
+                spawn_scoreboard,
+                spawn_camera,
+            ),
         )
         .add_systems(
             FixedUpdate,
@@ -95,6 +107,8 @@ fn main() {
                 handle_collisions.after(move_ball),
                 constrain_paddle_position.after(move_paddles),
                 detect_goal.after(move_ball),
+                update_scoreboard,
+                move_ai,
             ),
         )
         .add_observer(reset_ball)
@@ -174,6 +188,54 @@ fn spawn_gutters(
         MeshMaterial2d(material.clone()),
         Position(bottom_gutter_position),
         Collider(gutter_shape),
+    ));
+}
+
+fn spawn_scoreboard(mut commands: Commands) {
+    let container = Node {
+        width: percent(100.),
+        height: percent(100.),
+        justify_content: JustifyContent::Center,
+        ..default()
+    };
+
+    let header = Node {
+        width: px(200.),
+        height: px(100.),
+        ..default()
+    };
+
+    let player_score = (
+        PlayerScore,
+        Text::new("0"),
+        TextFont::from_font_size(72.),
+        TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
+        TextLayout::new_with_justify(Justify::Center),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(20.),
+            left: px(25.),
+            ..default()
+        },
+    );
+
+    let ai_score = (
+        AiScore,
+        Text::new("0"),
+        TextFont::from_font_size(72.),
+        TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
+        TextLayout::new_with_justify(Justify::Center),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(20.),
+            right: px(25.),
+            ..default()
+        },
+    );
+
+    commands.spawn((
+        container,
+        children![(header, children![player_score, ai_score])],
     ));
 }
 
@@ -274,6 +336,12 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
     }
 }
 
+fn move_ai(ai: Single<(&mut Velocity, &Position), With<Ai>>, ball: Single<&Position, With<Ball>>) {
+    let (mut velocity, position) = ai.into_inner();
+    let a_to_b = ball.0 - position.0;
+    velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
+}
+
 fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
     if !ball.intersects(&wall) {
         return None;
@@ -335,5 +403,16 @@ fn update_score(
     if is_player.get(event.scorer).is_ok() {
         score.player += 1;
         info!("Player scored! {} – {}", score.player, score.ai);
+    }
+}
+
+fn update_scoreboard(
+    mut player_score: Single<&mut Text, (With<PlayerScore>, Without<AiScore>)>,
+    mut ai_score: Single<&mut Text, (With<AiScore>, Without<PlayerScore>)>,
+    score: Res<Score>,
+) {
+    if score.is_changed() {
+        player_score.0 = score.player.to_string();
+        ai_score.0 = score.ai.to_string();
     }
 }
