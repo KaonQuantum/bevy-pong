@@ -1,16 +1,21 @@
 use bevy::{
-    math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
+    math::{
+        bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
+        ops::sqrt,
+    },
     prelude::*,
 };
 
 const BALL_SIZE: f32 = 5.;
 const BALL_SHAPE: Circle = Circle::new(BALL_SIZE);
 const BALL_COLOR: Color = Color::srgb_u8(0xf7, 0x25, 0x85);
-const BALL_SPEED: f32 = 2.;
+const BALL_SPEED: f32 = 2.1;
+const SQUARE_BALL_SPEED: f32 = BALL_SPEED * BALL_SPEED;
+const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
-const PADDLE_SPEED: f32 = 5.;
+const PADDLE_SPEED: f32 = 3.7;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -43,7 +48,7 @@ enum Collision {
 #[require(
     Position,
     Velocity = Velocity(Vec2::new(-BALL_SPEED, BALL_SPEED)),
-    Collider = Collider(Rectangle::new(BALL_SIZE, BALL_SIZE)),
+    Collider = Collider(Rectangle::new(BALL_SIZE * 2., BALL_SIZE * 2.)),
 )]
 struct Ball;
 
@@ -83,10 +88,14 @@ struct Scored {
     scorer: Entity,
 }
 
+#[derive(Resource)]
+struct Rng(fastrand::Rng);
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(Score { player: 0, ai: 0 })
+        .insert_resource(Rng(fastrand::Rng::new()))
         .add_systems(
             Startup,
             (
@@ -255,33 +264,52 @@ fn move_ball(ball: Single<(&mut Position, &Velocity), With<Ball>>) {
 }
 
 fn handle_collisions(
-    ball: Single<(&mut Velocity, &Position, &Collider), With<Ball>>,
+    ball: Single<(&mut Velocity, &mut Position, &Collider), With<Ball>>,
     other_things: Query<(&Position, &Collider), Without<Ball>>,
+    mut rng: ResMut<Rng>,
 ) {
-    let (mut ball_velocity, ball_position, ball_collider) = ball.into_inner();
+    let (mut ball_velocity, mut ball_position, ball_collider) = ball.into_inner();
 
     for (other_position, other_collider) in &other_things {
         if let Some(collision) = collide_with_side(
             Aabb2d::new(ball_position.0, ball_collider.half_size()),
             Aabb2d::new(other_position.0, other_collider.half_size()),
         ) {
+            let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
+            let temp_rnd = BALL_SPEED - rnd.abs();
+            let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
             match collision {
                 Collision::Left => {
+                    ball_position.0.x = other_position.0.x
+                        - other_collider.half_size().x
+                        - ball_collider.half_size().x;
                     ball_velocity.0.x *= -1.;
                 }
 
                 Collision::Right => {
+                    ball_position.0.x = other_position.0.x
+                        + other_collider.half_size().x
+                        + ball_collider.half_size().x;
                     ball_velocity.0.x *= -1.;
                 }
 
                 Collision::Top => {
+                    ball_position.0.y = other_position.0.y
+                        + other_collider.half_size().y
+                        + ball_collider.half_size().x;
                     ball_velocity.0.y *= -1.;
                 }
 
                 Collision::Bottom => {
+                    ball_position.0.y = other_position.0.y
+                        - other_collider.half_size().y
+                        - ball_collider.half_size().x;
                     ball_velocity.0.y *= -1.;
                 }
             }
+
+            ball_velocity.0.x += rnd;
+            ball_velocity.0.y += other_rnd;
         }
     }
 }
@@ -339,7 +367,9 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
 fn move_ai(ai: Single<(&mut Velocity, &Position), With<Ai>>, ball: Single<&Position, With<Ball>>) {
     let (mut velocity, position) = ai.into_inner();
     let a_to_b = ball.0 - position.0;
-    velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
+    if a_to_b.y.abs() > 1.5 {
+        velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
+    }
 }
 
 fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
@@ -383,10 +413,18 @@ fn detect_goal(
     }
 }
 
-fn reset_ball(_event: On<Scored>, ball: Single<(&mut Position, &mut Velocity), With<Ball>>) {
+fn reset_ball(
+    _event: On<Scored>,
+    ball: Single<(&mut Position, &mut Velocity), With<Ball>>,
+    mut rng: ResMut<Rng>,
+) {
     let (mut ball_position, mut ball_velocity) = ball.into_inner();
     ball_position.0 = Vec2::ZERO;
-    ball_velocity.0 = Vec2::new(-BALL_SPEED, BALL_SPEED);
+    let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
+    let temp_rnd = BALL_SPEED - rnd.abs();
+    let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
+
+    ball_velocity.0 = Vec2::new(-BALL_SPEED + rnd, BALL_SPEED + other_rnd);
 }
 
 fn update_score(
