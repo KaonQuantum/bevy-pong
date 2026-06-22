@@ -277,7 +277,9 @@ fn handle_collisions(
         ) {
             let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
             let temp_rnd = BALL_SPEED - rnd.abs();
-            let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
+            let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd) * {
+                if rng.0.bool() { 1. } else { -1. }
+            };
             match collision {
                 Collision::Left => {
                     ball_position.0.x = other_position.0.x
@@ -364,11 +366,16 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
     }
 }
 
-fn move_ai(ai: Single<(&mut Velocity, &Position), With<Ai>>, ball: Single<&Position, With<Ball>>) {
+fn move_ai(
+    ai: Single<(&mut Velocity, &Position), With<Ai>>,
+    ball: Single<&Position, With<Ball>>,
+    score: Res<Score>,
+) {
     let (mut velocity, position) = ai.into_inner();
     let a_to_b = ball.0 - position.0;
     if a_to_b.y.abs() > 1.5 {
-        velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
+        velocity.0.y =
+            a_to_b.y.signum() * (PADDLE_SPEED + ((score.player as f32 - score.ai as f32) / 100.));
     }
 }
 
@@ -414,17 +421,30 @@ fn detect_goal(
 }
 
 fn reset_ball(
-    _event: On<Scored>,
+    event: On<Scored>,
     ball: Single<(&mut Position, &mut Velocity), With<Ball>>,
+    is_player: Query<&Player>,
     mut rng: ResMut<Rng>,
 ) {
     let (mut ball_position, mut ball_velocity) = ball.into_inner();
     ball_position.0 = Vec2::ZERO;
     let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
     let temp_rnd = BALL_SPEED - rnd.abs();
-    let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
+    let other_rnd =
+        sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd) * { if rng.0.bool() { 1. } else { -1. } };
 
-    ball_velocity.0 = Vec2::new(-BALL_SPEED + rnd, BALL_SPEED + other_rnd);
+    let v_x_mult = if is_player.get(event.scorer).is_ok() {
+        1.
+    } else {
+        -1.
+    };
+
+    let v_y_mult = if rng.0.bool() { 1. } else { -1. };
+
+    ball_velocity.0 = Vec2::new(
+        v_x_mult * (-BALL_SPEED + rnd),
+        v_y_mult * (BALL_SPEED + other_rnd),
+    );
 }
 
 fn update_score(
