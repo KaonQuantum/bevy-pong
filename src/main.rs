@@ -279,7 +279,6 @@ fn handle_collisions(
             let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
             let temp_rnd = BALL_SPEED - rnd;
             let other_rnd = sqrt(2.0 * SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
-            let y_sign = if rng.0.bool() { 1. } else { -1. };
             match collision {
                 Collision::Left => {
                     ball_position.0.x = other_position.0.x
