@@ -16,6 +16,7 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
 const PADDLE_SPEED: f32 = 3.7;
+const ADAPTIVITY_SCORE: f32 = 1.;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -276,42 +277,38 @@ fn handle_collisions(
             Aabb2d::new(other_position.0, other_collider.half_size()),
         ) {
             let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
-            let temp_rnd = BALL_SPEED - rnd.abs();
-            let other_rnd = sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd) * {
-                if rng.0.bool() { 1. } else { -1. }
-            };
+            let temp_rnd = BALL_SPEED - rnd;
+            let other_rnd = sqrt(2.0 * SQUARE_BALL_SPEED - temp_rnd * temp_rnd);
+            let y_sign = if rng.0.bool() { 1. } else { -1. };
             match collision {
                 Collision::Left => {
                     ball_position.0.x = other_position.0.x
                         - other_collider.half_size().x
                         - ball_collider.half_size().x;
-                    ball_velocity.0.x *= -1.;
+                    ball_velocity.0 = Vec2::new(-temp_rnd, other_rnd * y_sign);
                 }
 
                 Collision::Right => {
                     ball_position.0.x = other_position.0.x
                         + other_collider.half_size().x
                         + ball_collider.half_size().x;
-                    ball_velocity.0.x *= -1.;
+                    ball_velocity.0 = Vec2::new(temp_rnd, other_rnd * y_sign);
                 }
 
                 Collision::Top => {
                     ball_position.0.y = other_position.0.y
                         + other_collider.half_size().y
                         + ball_collider.half_size().x;
-                    ball_velocity.0.y *= -1.;
+                    ball_velocity.0 = Vec2::new(other_rnd * ball_velocity.0.x.signum(), temp_rnd);
                 }
 
                 Collision::Bottom => {
                     ball_position.0.y = other_position.0.y
                         - other_collider.half_size().y
                         - ball_collider.half_size().x;
-                    ball_velocity.0.y *= -1.;
+                    ball_velocity.0 = Vec2::new(other_rnd * ball_velocity.0.x.signum(), -temp_rnd);
                 }
             }
-
-            ball_velocity.0.x += rnd;
-            ball_velocity.0.y += other_rnd;
         }
     }
 }
@@ -373,9 +370,9 @@ fn move_ai(
 ) {
     let (mut velocity, position) = ai.into_inner();
     let a_to_b = ball.0 - position.0;
-    if a_to_b.y.abs() > 1.5 {
-        velocity.0.y =
-            a_to_b.y.signum() * (PADDLE_SPEED + ((score.player as f32 - score.ai as f32) / 100.));
+    if a_to_b.y.abs() > 0.5 {
+        velocity.0.y = a_to_b.y.signum()
+            * (PADDLE_SPEED + ((score.player as f32 - score.ai as f32) / ADAPTIVITY_SCORE));
     }
 }
 
@@ -429,9 +426,10 @@ fn reset_ball(
     let (mut ball_position, mut ball_velocity) = ball.into_inner();
     ball_position.0 = Vec2::ZERO;
     let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
-    let temp_rnd = BALL_SPEED - rnd.abs();
-    let other_rnd =
-        sqrt(SQUARE_BALL_SPEED - temp_rnd * temp_rnd) * { if rng.0.bool() { 1. } else { -1. } };
+    let temp_rnd = BALL_SPEED - rnd;
+    let other_rnd = sqrt(2.0 * SQUARE_BALL_SPEED - temp_rnd * temp_rnd) * {
+        if rng.0.bool() { 1. } else { -1. }
+    };
 
     let v_x_mult = if is_player.get(event.scorer).is_ok() {
         1.
@@ -441,10 +439,7 @@ fn reset_ball(
 
     let v_y_mult = if rng.0.bool() { 1. } else { -1. };
 
-    ball_velocity.0 = Vec2::new(
-        v_x_mult * (-BALL_SPEED + rnd),
-        v_y_mult * (BALL_SPEED + other_rnd),
-    );
+    ball_velocity.0 = Vec2::new(v_x_mult * (-BALL_SPEED + rnd), v_y_mult * other_rnd);
 }
 
 fn update_score(
