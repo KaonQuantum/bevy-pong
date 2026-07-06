@@ -16,7 +16,7 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
 const PADDLE_SPEED: f32 = 3.7;
-const ADAPTIVITY_SCORE: f32 = 1.;
+const ADAPTIVITY_SCORE: f32 = 0.5;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -285,14 +285,14 @@ fn handle_collisions(
                     ball_position.0.x = other_position.0.x
                         - other_collider.half_size().x
                         - ball_collider.half_size().x;
-                    ball_velocity.0 = Vec2::new(-temp_rnd, other_rnd * y_sign);
+                    ball_velocity.0 = Vec2::new(-temp_rnd, other_rnd * ball_velocity.0.y.signum());
                 }
 
                 Collision::Right => {
                     ball_position.0.x = other_position.0.x
                         + other_collider.half_size().x
                         + ball_collider.half_size().x;
-                    ball_velocity.0 = Vec2::new(temp_rnd, other_rnd * y_sign);
+                    ball_velocity.0 = Vec2::new(temp_rnd, other_rnd * ball_velocity.0.y.signum());
                 }
 
                 Collision::Top => {
