@@ -16,10 +16,20 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
 const PADDLE_SPEED: f32 = 3.7;
-const ADAPTIVITY_SCORE: f32 = 0.5;
+const ADAPTIVITY_SCORE: f32 = 15.;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
+
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
+enum GameState {
+    #[default]
+    Menu,
+    Playing,
+}
+
+#[derive(Component)]
+struct MenuScreen;
 
 #[derive(Component, Default)]
 #[require(Transform)]
@@ -95,17 +105,19 @@ struct Rng(fastrand::Rng);
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .init_state::<GameState>()
         .insert_resource(Score { player: 0, ai: 0 })
         .insert_resource(Rng(fastrand::Rng::new()))
+        .add_systems(Startup, spawn_camera)
+        .add_systems(OnEnter(GameState::Menu), spawn_menu)
         .add_systems(
-            Startup,
-            (
-                spawn_ball,
-                spawn_paddles,
-                spawn_gutters,
-                spawn_scoreboard,
-                spawn_camera,
-            ),
+            Update,
+            handle_start_button.run_if(in_state(GameState::Menu)),
+        )
+        .add_systems(OnExit(GameState::Menu), despawn_menu)
+        .add_systems(
+            OnEnter(GameState::Playing),
+            (spawn_ball, spawn_paddles, spawn_gutters, spawn_scoreboard),
         )
         .add_systems(
             FixedUpdate,
@@ -119,11 +131,50 @@ fn main() {
                 detect_goal.after(move_ball),
                 update_scoreboard,
                 move_ai.before(project_positions),
-            ),
+            )
+                .run_if(in_state(GameState::Playing)),
         )
         .add_observer(reset_ball)
         .add_observer(update_score)
         .run();
+}
+
+fn spawn_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let font = asset_server.load("fonts/PixelifySans-Regular.ttf");
+
+    let container = Node {
+        width: percent(100.),
+        height: percent(100.),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+
+    let button = (
+        Button,
+        Node {
+            width: px(150.),
+            height: px(65.),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(px(2.)),
+            ..default()
+        },
+        BorderColor::all(Color::BLACK),
+        BackgroundColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
+    );
+
+    let label = (
+        Text::new("Start"),
+        TextFont {
+            font,
+            font_size: 40.,
+            ..default()
+        },
+        TextColor(Color::BLACK),
+    );
+
+    commands.spawn((MenuScreen, container, children![(button, children![label])]));
 }
 
 fn spawn_ball(
@@ -201,7 +252,9 @@ fn spawn_gutters(
     ));
 }
 
-fn spawn_scoreboard(mut commands: Commands) {
+fn spawn_scoreboard(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let font = asset_server.load("fonts/PixelifySans-Regular.ttf");
+
     let container = Node {
         width: percent(100.),
         height: percent(100.),
@@ -218,7 +271,11 @@ fn spawn_scoreboard(mut commands: Commands) {
     let player_score = (
         PlayerScore,
         Text::new("0"),
-        TextFont::from_font_size(72.),
+        TextFont {
+            font: font.clone(),
+            font_size: 72.,
+            ..default()
+        },
         TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
         TextLayout::new_with_justify(Justify::Center),
         Node {
@@ -232,7 +289,11 @@ fn spawn_scoreboard(mut commands: Commands) {
     let ai_score = (
         AiScore,
         Text::new("0"),
-        TextFont::from_font_size(72.),
+        TextFont {
+            font,
+            font_size: 72.,
+            ..default()
+        },
         TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
         TextLayout::new_with_justify(Justify::Center),
         Node {
@@ -251,6 +312,23 @@ fn spawn_scoreboard(mut commands: Commands) {
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
+
+fn handle_start_button(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    for interaction in interaction_query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(GameState::Playing);
+        }
+    }
+}
+
+fn despawn_menu(mut commands: Commands, query: Query<Entity, With<MenuScreen>>) {
+    for entity in query {
+        commands.entity(entity).despawn();
+    }
 }
 
 fn project_positions(mut positionables: Query<(&mut Transform, &Position)>) {
