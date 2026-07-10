@@ -174,8 +174,8 @@ fn spawn_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     let label = (
         Text::new("Start"),
         TextFont {
-            font,
-            font_size: 40.,
+            font: FontSource::Handle(font),
+            font_size: FontSize::Px(40.),
             ..default()
         },
         TextColor(Color::BLACK),
@@ -279,12 +279,12 @@ fn spawn_scoreboard(mut commands: Commands, asset_server: Res<AssetServer>) {
         PlayerScore,
         Text::new("0"),
         TextFont {
-            font: font.clone(),
-            font_size: 72.,
+            font: FontSource::Handle(font.clone()),
+            font_size: FontSize::Px(72.),
             ..default()
         },
         TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
-        TextLayout::new_with_justify(Justify::Center),
+        TextLayout::justify(Justify::Center),
         Node {
             position_type: PositionType::Absolute,
             top: px(20.),
@@ -297,12 +297,12 @@ fn spawn_scoreboard(mut commands: Commands, asset_server: Res<AssetServer>) {
         AiScore,
         Text::new("0"),
         TextFont {
-            font,
-            font_size: 72.,
+            font: FontSource::Handle(font),
+            font_size: FontSize::Px(72.),
             ..default()
         },
         TextColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
-        TextLayout::new_with_justify(Justify::Center),
+        TextLayout::justify(Justify::Center),
         Node {
             position_type: PositionType::Absolute,
             top: px(20.),
