@@ -16,7 +16,7 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
 const PADDLE_SPEED: f32 = 3.7;
-const ADAPTIVITY_SCORE: f32 = 15.;
+const ADAPTIVITY_SCORE: f32 = 10.;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -82,6 +82,9 @@ struct Player;
 struct Ai;
 
 #[derive(Resource)]
+struct AiMovementTimer(Timer);
+
+#[derive(Resource)]
 struct Score {
     player: u8,
     ai: u8,
@@ -108,6 +111,10 @@ fn main() {
         .init_state::<GameState>()
         .insert_resource(Score { player: 0, ai: 0 })
         .insert_resource(Rng(fastrand::Rng::new()))
+        .insert_resource(AiMovementTimer(Timer::from_seconds(
+            0.1,
+            TimerMode::Repeating,
+        )))
         .add_systems(Startup, spawn_camera)
         .add_systems(OnEnter(GameState::Menu), spawn_menu)
         .add_systems(
@@ -444,10 +451,12 @@ fn move_ai(
     ai: Single<(&mut Velocity, &Position), With<Ai>>,
     ball: Single<&Position, With<Ball>>,
     score: Res<Score>,
+    time: Res<Time>,
+    mut timer: ResMut<AiMovementTimer>,
 ) {
-    let (mut velocity, position) = ai.into_inner();
-    let a_to_b = ball.0 - position.0;
-    if a_to_b.y.abs() > 0.5 {
+    if timer.0.tick(time.delta()).just_finished() {
+        let (mut velocity, position) = ai.into_inner();
+        let a_to_b = ball.0 - position.0;
         velocity.0.y = a_to_b.y.signum()
             * (PADDLE_SPEED + ((score.player as f32 - score.ai as f32) / ADAPTIVITY_SCORE));
     }
