@@ -15,8 +15,7 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
-const PADDLE_SPEED: f32 = 3.7;
-const ADAPTIVITY_SCORE: f32 = 10.;
+const PADDLE_SPEED: f32 = 4.2;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -450,15 +449,13 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
 fn move_ai(
     ai: Single<(&mut Velocity, &Position), With<Ai>>,
     ball: Single<&Position, With<Ball>>,
-    score: Res<Score>,
     time: Res<Time>,
     mut timer: ResMut<AiMovementTimer>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         let (mut velocity, position) = ai.into_inner();
         let a_to_b = ball.0 - position.0;
-        velocity.0.y = a_to_b.y.signum()
-            * (PADDLE_SPEED + ((score.player as f32 - score.ai as f32) / ADAPTIVITY_SCORE));
+        velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
     }
 }
 
