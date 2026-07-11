@@ -20,15 +20,43 @@ const PADDLE_SPEED: f32 = 4.2;
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
 
+const WIN_MESSAGES: &[&str] = &[
+    "You Win",
+    "Easy Dubs",
+    "Aura Farmed",
+    "A+",
+    "Slaughtered",
+    "Veni, Vidi, Vici",
+    "Easy Mode",
+    "You Ate That",
+];
+const NUM_WIN_MESSAGES: usize = WIN_MESSAGES.len();
+
+const LOSS_MESSAGES: &[&str] = &[
+    "Game Over",
+    "Wops Moment",
+    "Major L",
+    "Rigged!",
+    "Skill Issue",
+    "Forgot Keybinds",
+    "It Glitched!",
+    "Couldn't Count to 10",
+];
+const NUM_LOSS_MESSAGES: usize = LOSS_MESSAGES.len();
+
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
 enum GameState {
     #[default]
     Menu,
     Playing,
+    End,
 }
 
 #[derive(Component)]
 struct MenuScreen;
+
+#[derive(Component, Default)]
+struct PlayScreen;
 
 #[derive(Component, Default)]
 #[require(Transform)]
@@ -59,6 +87,7 @@ enum Collision {
     Position,
     Velocity = Velocity(Vec2::new(-BALL_SPEED, BALL_SPEED)),
     Collider = Collider(Rectangle::new(BALL_SIZE * 2., BALL_SIZE * 2.)),
+    PlayScreen,
 )]
 struct Ball;
 
@@ -67,11 +96,12 @@ struct Ball;
     Position,
     Velocity,
     Collider = Collider(PADDLE_SHAPE),
+    PlayScreen,
 )]
 struct Paddle;
 
 #[derive(Component)]
-#[require(Position, Collider)]
+#[require(Position, Collider, PlayScreen)]
 struct Gutter;
 
 #[derive(Component)]
@@ -118,7 +148,7 @@ fn main() {
         .add_systems(OnEnter(GameState::Menu), spawn_menu)
         .add_systems(
             Update,
-            handle_start_button.run_if(in_state(GameState::Menu)),
+            handle_start_button.run_if(in_state(GameState::Menu).or_else(in_state(GameState::End))),
         )
         .add_systems(OnExit(GameState::Menu), despawn_menu)
         .add_systems(
@@ -140,6 +170,9 @@ fn main() {
             )
                 .run_if(in_state(GameState::Playing)),
         )
+        .add_systems(OnExit(GameState::Playing), despawn_play)
+        .add_systems(OnEnter(GameState::End), spawn_end)
+        .add_systems(OnExit(GameState::End), despawn_menu)
         .add_observer(reset_ball)
         .add_observer(update_score)
         .run();
@@ -312,12 +345,79 @@ fn spawn_scoreboard(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn((
         container,
+        PlayScreen,
         children![(header, children![player_score, ai_score])],
     ));
 }
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
+
+fn spawn_end(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut score: ResMut<Score>,
+    mut rng: ResMut<Rng>,
+) {
+    let font = asset_server.load("fonts/PixelifySans-Regular.ttf");
+
+    let container = Node {
+        height: percent(100.),
+        width: percent(100.),
+        flex_direction: FlexDirection::Column,
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        row_gap: Val::Px(40.),
+        ..default()
+    };
+
+    let button = (
+        Button,
+        Node {
+            width: px(200.),
+            height: px(65.),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(px(2.)),
+            ..default()
+        },
+        BorderColor::all(Color::BLACK),
+        BackgroundColor(Color::srgb_u8(0x72, 0x09, 0xb7)),
+    );
+
+    let label = (
+        Text::new("Restart"),
+        TextFont {
+            font: FontSource::Handle(font.clone()),
+            font_size: FontSize::Px(40.),
+            ..default()
+        },
+    );
+
+    let text = if score.player == 10 {
+        WIN_MESSAGES[rng.0.usize(0..NUM_WIN_MESSAGES)]
+    } else {
+        LOSS_MESSAGES[rng.0.usize(0..NUM_LOSS_MESSAGES)]
+    };
+
+    score.player = 0;
+    score.ai = 0;
+
+    let message = (
+        Text::new(text),
+        TextFont {
+            font: FontSource::Handle(font),
+            font_size: FontSize::Px(100.),
+            ..default()
+        },
+    );
+
+    commands.spawn((
+        MenuScreen,
+        container,
+        children![message, (button, children![label])],
+    ));
 }
 
 fn handle_start_button(
@@ -332,6 +432,12 @@ fn handle_start_button(
 }
 
 fn despawn_menu(mut commands: Commands, query: Query<Entity, With<MenuScreen>>) {
+    for entity in query {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn despawn_play(mut commands: Commands, query: Query<Entity, With<PlayScreen>>) {
     for entity in query {
         commands.entity(entity).despawn();
     }
@@ -530,6 +636,7 @@ fn update_score(
     mut score: ResMut<Score>,
     is_ai: Query<&Ai>,
     is_player: Query<&Player>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     if is_ai.get(event.scorer).is_ok() {
         score.ai += 1;
@@ -539,6 +646,10 @@ fn update_score(
     if is_player.get(event.scorer).is_ok() {
         score.player += 1;
         info!("Player scored! {} – {}", score.player, score.ai);
+    }
+
+    if score.ai == 10 || score.player == 10 {
+        next_state.set(GameState::End);
     }
 }
 
