@@ -138,6 +138,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .init_state::<GameState>()
+        .insert_resource(ClearColor(Color::srgb_u8(0x22, 0x1e, 0x22)))
         .insert_resource(Score { player: 0, ai: 0 })
         .insert_resource(Rng(fastrand::Rng::new()))
         .insert_resource(AiMovementTimer(Timer::from_seconds(
@@ -393,12 +394,19 @@ fn spawn_end(
             font_size: FontSize::Px(40.),
             ..default()
         },
+        TextColor(Color::BLACK),
     );
 
-    let text = if score.player == 10 {
-        WIN_MESSAGES[rng.0.usize(0..NUM_WIN_MESSAGES)]
+    let (text, color) = if score.player == 10 {
+        (
+            WIN_MESSAGES[rng.0.usize(0..NUM_WIN_MESSAGES)],
+            Color::srgb_u8(0x73, 0xee, 0xdc),
+        )
     } else {
-        LOSS_MESSAGES[rng.0.usize(0..NUM_LOSS_MESSAGES)]
+        (
+            LOSS_MESSAGES[rng.0.usize(0..NUM_LOSS_MESSAGES)],
+            Color::srgb_u8(0xf7, 0x25, 0x85),
+        )
     };
 
     score.player = 0;
@@ -411,6 +419,7 @@ fn spawn_end(
             font_size: FontSize::Px(100.),
             ..default()
         },
+        TextColor(color),
     );
 
     commands.spawn((
