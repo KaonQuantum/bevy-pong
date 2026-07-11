@@ -36,10 +36,10 @@ const LOSS_MESSAGES: &[&str] = &[
     "Game Over",
     "Wops Moment",
     "Major L",
-    "Rigged!",
+    "Couldn't Be Me",
     "Skill Issue",
     "Forgot Keybinds",
-    "It Glitched!",
+    "No Aura",
     "Couldn't Count to 10",
 ];
 const NUM_LOSS_MESSAGES: usize = LOSS_MESSAGES.len();
@@ -474,6 +474,7 @@ fn handle_collisions(
         if let Some(collision) = collide_with_side(
             Aabb2d::new(ball_position.0, ball_collider.half_size()),
             Aabb2d::new(other_position.0, other_collider.half_size()),
+            ball_velocity.0,
         ) {
             let rnd = (rng.0.f32_inclusive() - 0.5) * FRACTIONAL_BALL_SPEED;
             let temp_rnd = BALL_SPEED - rnd;
@@ -534,7 +535,7 @@ fn constrain_paddle_position(
             let paddle_aabb = Aabb2d::new(paddle_position.0, paddle_collider.half_size());
             let gutter_aabb = Aabb2d::new(gutter_position.0, gutter_collider.half_size());
 
-            if let Some(collision) = collide_with_side(paddle_aabb, gutter_aabb) {
+            if let Some(collision) = collide_with_side(paddle_aabb, gutter_aabb, Vec2::ZERO) {
                 match collision {
                     Collision::Top => {
                         paddle_position.0.y = gutter_position.0.y
@@ -574,7 +575,7 @@ fn move_ai(
     }
 }
 
-fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
+fn collide_with_side(ball: Aabb2d, wall: Aabb2d, ball_vel: Vec2) -> Option<Collision> {
     if !ball.intersects(&wall) {
         return None;
     }
@@ -591,6 +592,40 @@ fn collide_with_side(ball: Aabb2d, wall: Aabb2d) -> Option<Collision> {
         Collision::Top
     } else {
         Collision::Bottom
+    };
+
+    // Resolve corner misclassification: if the detected side contradicts the
+    // ball's approach direction, fall back to the other axis.
+    let side = match side {
+        Collision::Left if ball_vel.x < 0. => {
+            if offset.y > 0. {
+                Collision::Top
+            } else {
+                Collision::Bottom
+            }
+        }
+        Collision::Right if ball_vel.x > 0. => {
+            if offset.y > 0. {
+                Collision::Top
+            } else {
+                Collision::Bottom
+            }
+        }
+        Collision::Top if ball_vel.y > 0. => {
+            if offset.x < 0. {
+                Collision::Left
+            } else {
+                Collision::Right
+            }
+        }
+        Collision::Bottom if ball_vel.y < 0. => {
+            if offset.x < 0. {
+                Collision::Left
+            } else {
+                Collision::Right
+            }
+        }
+        other => other,
     };
 
     Some(side)
