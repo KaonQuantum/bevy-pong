@@ -42,7 +42,7 @@ const LOSS_MESSAGES: &[&str] = &[
     "Forgot Keybinds",
     "No Aura",
     "Couldn't Count to 10",
-    "Ate Chick-fil-A instead of Taco Bell",
+    "Didn't Hydrate",
 ];
 const NUM_LOSS_MESSAGES: usize = LOSS_MESSAGES.len();
 
