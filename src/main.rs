@@ -29,6 +29,7 @@ const WIN_MESSAGES: &[&str] = &[
     "Veni, Vidi, Vici",
     "Easy Mode",
     "You Ate That",
+    "Nuggies Acquired",
 ];
 const NUM_WIN_MESSAGES: usize = WIN_MESSAGES.len();
 
@@ -41,6 +42,7 @@ const LOSS_MESSAGES: &[&str] = &[
     "Forgot Keybinds",
     "No Aura",
     "Couldn't Count to 10",
+    "Ate Chick-fil-A instead of Taco Bell",
 ];
 const NUM_LOSS_MESSAGES: usize = LOSS_MESSAGES.len();
 
