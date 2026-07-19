@@ -20,6 +20,8 @@ const PADDLE_SPEED: f32 = 4.2;
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
 
+const END_SCORE: u8 = 5;
+
 const WIN_MESSAGES: &[&str] = &[
     "You Win",
     "Easy Dubs",
@@ -694,7 +696,7 @@ fn update_score(
         info!("Player scored! {} – {}", score.player, score.ai);
     }
 
-    if score.ai == 10 || score.player == 10 {
+    if score.ai == END_SCORE || score.player == END_SCORE {
         next_state.set(GameState::End);
     }
 }
