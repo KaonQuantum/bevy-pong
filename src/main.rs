@@ -1,9 +1,8 @@
 use bevy::{
-    math::{
+    asset::AssetMetaCheck, math::{
         bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
         ops::sqrt,
-    },
-    prelude::*,
+    }, prelude::*, window::WindowResolution
 };
 
 const BALL_SIZE: f32 = 5.;
@@ -140,7 +139,20 @@ struct Rng(fastrand::Rng);
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins
+            .set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
+                ..default()
+            })
+            .set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: WindowResolution::new(1280, 720),
+                fit_canvas_to_parent: false,
+                ..default()
+            }),
+            ..default()
+            }
+        ))
         .init_state::<GameState>()
         .insert_resource(ClearColor(Color::srgb_u8(0x22, 0x1e, 0x22)))
         .insert_resource(Score { player: 0, ai: 0 })
@@ -401,7 +413,7 @@ fn spawn_end(
         TextColor(Color::BLACK),
     );
 
-    let (text, color) = if score.player == 10 {
+    let (text, color) = if score.player == END_SCORE {
         (
             WIN_MESSAGES[rng.0.usize(0..NUM_WIN_MESSAGES)],
             Color::srgb_u8(0x73, 0xee, 0xdc),
