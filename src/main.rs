@@ -1,8 +1,11 @@
 use bevy::{
-    asset::AssetMetaCheck, math::{
+    asset::AssetMetaCheck,
+    math::{
         bounding::{Aabb2d, BoundingVolume, IntersectsVolume},
         ops::sqrt,
-    }, prelude::*, window::WindowResolution
+    },
+    prelude::*,
+    window::WindowResolution,
 };
 
 const BALL_SIZE: f32 = 5.;
@@ -139,20 +142,22 @@ struct Rng(fastrand::Rng);
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins
-            .set(AssetPlugin {
-                meta_check: AssetMetaCheck::Never,
-                ..default()
-            })
-            .set(WindowPlugin {
-            primary_window: Some(Window {
-                resolution: WindowResolution::new(1280, 720),
-                fit_canvas_to_parent: false,
-                ..default()
-            }),
-            ..default()
-            }
-        ))
+        .add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    meta_check: AssetMetaCheck::Never,
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resolution: WindowResolution::new(1280, 720),
+                        fit_canvas_to_parent: false,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .disable::<bevy::audio::AudioPlugin>(),
+        )
         .init_state::<GameState>()
         .insert_resource(ClearColor(Color::srgb_u8(0x22, 0x1e, 0x22)))
         .insert_resource(Score { player: 0, ai: 0 })
