@@ -4,45 +4,43 @@ on:
     tags:
       - 'v*'
 jobs:
-  build:
+  package:
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            binary: pong
+            formats: appimage,deb
             artifact: pong-linux
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary: pong.exe
-            artifact: pong-windows.exe
+            formats: wix
+            artifact: pong-windows
           - os: macos-latest
-            target: aarch64-apple-darwin
-            binary: pong
+            arch: aarch64-apple-darwin
+            formats: app
             artifact: pong-mac-arm
           - os: macos-latest
-            target: x86_64-apple-darwin
-            binary: pong
+            arch: x86_64-apple-darwin
+            formats: app
             artifact: pong-mac-intel
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.arch }}
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
-      - run: cargo build --release --target ${{ matrix.target }}
-      - name: Rename binary
-        shell: bash
-        run: cp target/${{ matrix.target }}/release/${{ matrix.binary }} ${{ matrix.artifact }}
+        run: sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev fuse libfuse2
+      - name: Install cargo-packager
+        run: cargo install cargo-packager --locked
+      - name: Package
+        run: cargo packager --release --formats ${{ matrix.formats }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
-  release:
-    needs: build
+          path: target/release/bundle/
+  publish:
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -52,8 +50,4 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            pong-linux
-            pong-windows.exe
-            pong-mac-arm
-            pong-mac-intel
+          files: "**/*"
