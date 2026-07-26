@@ -9,7 +9,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            formats: appimage,deb
+            formats: deb
             artifact: pong-linux
           - os: windows-latest
             formats: wix
