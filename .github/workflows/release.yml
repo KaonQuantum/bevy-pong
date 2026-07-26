@@ -17,9 +17,6 @@ jobs:
           - os: macos-latest
             formats: app
             artifact: pong-mac-arm
-          - os: macos-13
-            formats: app
-            artifact: pong-mac-intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -48,6 +45,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2.3.2
         with:
           files: "**/*"
