@@ -18,6 +18,7 @@ const FRACTIONAL_BALL_SPEED: f32 = BALL_SPEED / 50.;
 const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb_u8(0x73, 0xee, 0xdc);
 const PADDLE_SPEED: f32 = 4.2;
+const AI_PADDLE_TIME_DELAY: f32 = 0.09;
 
 const GUTTER_COLOR: Color = Color::srgb_u8(0x43, 0x61, 0xee);
 const GUTTER_HEIGHT: f32 = 20.;
@@ -163,7 +164,7 @@ fn main() {
         .insert_resource(Score { player: 0, ai: 0 })
         .insert_resource(Rng(fastrand::Rng::new()))
         .insert_resource(AiMovementTimer(Timer::from_seconds(
-            0.1,
+            AI_PADDLE_TIME_DELAY,
             TimerMode::Repeating,
         )))
         .add_systems(Startup, spawn_camera)
