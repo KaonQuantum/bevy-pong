@@ -32,6 +32,9 @@ jobs:
         run: cargo build --release
       - name: Package
         run: cargo packager --release --formats ${{ matrix.formats }}
+      - name: List bundle output
+        shell: bash
+        run: find target/release -name "*.app" -o -name "*.deb" -o -name "*.msi" 2>/dev/null || echo "No packages found"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
