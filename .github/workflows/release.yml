@@ -37,7 +37,9 @@ jobs:
         run: |
           mkdir -p staging
           find target/release -maxdepth 1 \( -name "*.deb" -o -name "*.msi" \) -exec cp {} staging/ \;
-          find target/release -maxdepth 1 -name "*.app" -exec cp -r {} staging/ \;
+          find target/release -maxdepth 1 -name "*.app" -print0 | while IFS= read -r -d '' app; do
+            ditto -c -k --keepParent "$app" "staging/$(basename "$app").zip"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
