@@ -141,11 +141,27 @@ struct Scored {
 #[derive(Resource)]
 struct Rng(fastrand::Rng);
 
+fn asset_path() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(contents) = exe.parent().and_then(|p| p.parent()) {
+                let p = contents.join("Resources/assets");
+                if p.exists() {
+                    return p.to_string_lossy().into_owned();
+                }
+            }
+        }
+    }
+    "assets".to_string()
+}
+
 fn main() {
     App::new()
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
+                    file_path: asset_path(),
                     meta_check: AssetMetaCheck::Never,
                     ..default()
                 })
