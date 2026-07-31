@@ -144,12 +144,12 @@ struct Rng(fastrand::Rng);
 fn asset_path() -> String {
     #[cfg(target_os = "macos")]
     {
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(contents) = exe.parent().and_then(|p| p.parent()) {
-                let p = contents.join("Resources/assets");
-                if p.exists() {
-                    return p.to_string_lossy().into_owned();
-                }
+        if let Ok(exe) = std::env::current_exe()
+            && let Some(contents) = exe.parent().and_then(|p| p.parent())
+        {
+            let p = contents.join("Resources/assets");
+            if p.exists() {
+                return p.to_string_lossy().into_owned();
             }
         }
     }
